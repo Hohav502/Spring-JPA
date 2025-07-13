@@ -7,12 +7,12 @@ import lombok.Setter;
 
 import java.util.List;
 
-@Setter
 @Getter
+@Setter
 @NoArgsConstructor
 @Entity
-@Table(name = "transaction_types")
-public class TransactionType {
+@Table(name = "account_types")
+public class AccountType {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -21,7 +21,6 @@ public class TransactionType {
     @Column(nullable = false, unique = true)
     private String typeName;
 
-    @OneToMany(mappedBy = "transactionType")
-    private List<Transaction>  transactions;
-
+    @OneToMany(mappedBy = "accountType")
+    private List<Account> accounts;
 }
