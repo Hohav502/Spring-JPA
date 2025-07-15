@@ -7,6 +7,9 @@ import com.example.mobilebankingapi.dto.UpdateCustomerRequest;
 import java.util.List;
 
 public interface CustomerService {
+
+    void disableByPhoneNumber(String phoneNumber);
+
     void deleteByPhoneNumber(String phoneNumber);
 
     CustomerRespone updateByPhoneNumber(String phoneNumber, UpdateCustomerRequest updateCustomerRequest);
