@@ -1,11 +1,14 @@
 package com.example.mobilebankingapi.service.impl;
 
 import com.example.mobilebankingapi.domain.Customer;
+import com.example.mobilebankingapi.domain.KYC;
+import com.example.mobilebankingapi.domain.Segment;
 import com.example.mobilebankingapi.dto.CreateCustomerRequest;
 import com.example.mobilebankingapi.dto.CustomerRespone;
 import com.example.mobilebankingapi.dto.UpdateCustomerRequest;
 import com.example.mobilebankingapi.mapper.CustomerMapper;
 import com.example.mobilebankingapi.repository.CustomerRepository;
+import com.example.mobilebankingapi.repository.KycRepository;
 import com.example.mobilebankingapi.service.CustomerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +25,9 @@ import java.util.List;
 @Slf4j
 public class CustomerServiceImpl implements CustomerService {
 
+    private final CustomerRepository customerRepository;
+    private final CustomerMapper customerMapper;
+    private final KycRepository kycRepository;
 
     @Override
     public void deleteByPhoneNumber(String phoneNumber) {
@@ -34,32 +40,24 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     public CustomerRespone updateByPhoneNumber(String phoneNumber, UpdateCustomerRequest updateCustomerRequest) {
-
         Customer customer = customerRepository
                 .findByPhoneNumber(phoneNumber)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Customer phone number not found"));
 
-
-
         customerMapper.toCustomerPartially(updateCustomerRequest, customer);
 
-       customer =  customerRepository.save(customer);
+        customer = customerRepository.save(customer);
 
         return customerMapper.fromCustomer(customer);
     }
 
     @Override
     public CustomerRespone findByPhoneNumber(String phoneNumber) {
-
         return customerRepository
                 .findByPhoneNumberAndIsDeletedFalse(phoneNumber)
                 .map(customerMapper::fromCustomer)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,"Customers phone number not found"));
     }
-
-
-    private final CustomerRepository customerRepository;
-    private final CustomerMapper customerMapper;
 
     @Transactional
     @Override
@@ -71,39 +69,42 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     @Override
-    public CustomerRespone createNew(CreateCustomerRequest createCustomerRequest){
-
-        //validate email
-        if(customerRepository.existsByEmail(createCustomerRequest.email())){
-            throw new ResponseStatusException(HttpStatus.CONFLICT ,"Phone number already exist!");
+    public CustomerRespone createNew(CreateCustomerRequest createCustomerRequest) {
+        // Validate email uniqueness
+        if (customerRepository.existsByEmail(createCustomerRequest.email())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists!");
         }
 
-          Customer customer = customerMapper.toCustomer(createCustomerRequest);
+        // Validate phone number uniqueness
+        if (customerRepository.existsByPhoneNumber(createCustomerRequest.phoneNumber())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Phone number already exists!");
+        }
 
-
-
-//        customer.setFullName(createCustomerRequest.fullName());
-//        customer.setGender(createCustomerRequest.gender());
-//        customer.setEmail(createCustomerRequest.email());
-//        customer.setPhoneNumber(createCustomerRequest.phoneNumber());
-//        customer.setRemark(createCustomerRequest.remark());
+        // Map DTO to entity
+        Customer customer = customerMapper.toCustomer(createCustomerRequest);
         customer.setIsDeleted(false);
         customer.setAccounts(new ArrayList<>());
 
+        // Validate and set segment enum
+        try {
+            customer.setSegment(Segment.valueOf(createCustomerRequest.segment().toUpperCase()));
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Segment must be GOLD, SILVER, or REGULAR");
+        }
 
-
-        log.info("Customer before save: {}", customer.getId());
+        // Save customer
         customer = customerRepository.save(customer);
 
-//        return CustomerRespone.builder()
-//                .fullName(customer.getFullName())
-//                .gender(customer.getGender())
-//                .email(customer.getEmail())
-//                .build();
+        // Auto-create KYC record with verified = false
+        KYC kyc = new KYC();
+        kyc.setCustomer(customer);
+        kyc.setNationalCardId(customer.getNationalCardId());
+        kyc.setIsVerified(false);
+        kyc.setIsDeleted(false);
+        kycRepository.save(kyc);
 
         return customerMapper.fromCustomer(customer);
     }
-
 
     @Override
     public List<CustomerRespone> findAll() {

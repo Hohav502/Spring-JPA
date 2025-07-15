@@ -46,5 +46,12 @@ public class Customer {
     @PrimaryKeyJoinColumn
     private KYC kyc;
 
+    @Column(nullable = false)
+    private String nationalCardId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Segment segment;
+
 }
 
